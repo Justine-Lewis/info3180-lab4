@@ -1,6 +1,6 @@
 import os
 from app import app, db, login_manager
-from flask import render_template, request, redirect, url_for, flash, session, abort
+from flask import render_template, request, redirect, url_for, flash, session, abort, send_from_directory
 from flask_login import login_user, logout_user, current_user, login_required
 from werkzeug.utils import secure_filename
 from app.models import UserProfile
@@ -39,10 +39,23 @@ def upload():
         img.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
         flash('File Saved', 'success')
-        return redirect(url_for('home')) # Update this to redirect the user to a route that displays all uploaded image files
+        return redirect(url_for('files')) # Update this to redirect the user to a route that displays all uploaded image files
     flash_errors(form)
     return render_template('upload.html', form=form)
 
+
+@app.route('/files')
+@login_required
+def files():
+    images = get_uploaded_images()
+    return render_template('files.html', images=images)
+
+@app.route('/uploads/<filename>', methods=['GET'])
+def get_image(filename):
+    return send_from_directory(
+        os.path.join(os.getcwd(), app.config['UPLOAD_FOLDER']),
+        filename)
+    
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
@@ -86,6 +99,21 @@ def load_user(id):
 # The functions below should be applicable to all Flask apps.
 ###
 
+def get_uploaded_images():
+    folder = os.path.join(os.getcwd(), app.config['UPLOAD_FOLDER'])
+    images = []
+
+    allowed_extensions = ('.jpg', '.jpeg', '.png')
+
+    for file_name in os.listdir(folder):
+        file_path = os.path.join(folder, file_name)
+
+        # only include real image files
+        if os.path.isfile(file_path) and file_name.lower().endswith(allowed_extensions):
+            images.append(file_name)
+
+    return images
+
 # Flash errors from the form if validation fails
 def flash_errors(form):
     for field, errors in form.errors.items():
@@ -94,6 +122,7 @@ def flash_errors(form):
                 getattr(form, field).label.text,
                 error
 ), 'danger')
+
 
 @app.route('/<file_name>.txt')
 def send_text_file(file_name):
